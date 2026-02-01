@@ -621,7 +621,7 @@ if st.session_state.analysis_complete:
                     if saved_data:
                         st.success(f"✅ Successfully saved {len(saved_data)} products to Supabase!")
                         st.info("💡 Tip: You can view the data in your Supabase dashboard under the 'receipt_products' table.")
-                        with st.expander("📋 View saved data")
+                        with st.expander("📋 View saved data"):
                             st.json(saved_data[:3] if len(saved_data) > 3 else saved_data)
                     else:
                         st.warning("⚠️ Save operation completed but no data was returned. Please check Supabase dashboard.")
