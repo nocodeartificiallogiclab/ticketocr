@@ -8,7 +8,7 @@ from supabase import create_client
 
 # --- Page config ---
 st.set_page_config(
-    page_title="Receipt Analysis",
+    page_title="Analytics",
     page_icon="📊",
     layout="wide",
 )
@@ -41,7 +41,7 @@ def parse_number(value):
     return float(match.group(0).replace(",", "."))
 
 
-st.title("📊 Receipt Analysis")
+st.title("📊 Analytics")
 st.markdown("Overview of saved receipt items and full history from `receipt_products`.")
 
 if st.button("🔄 Refresh Data"):
