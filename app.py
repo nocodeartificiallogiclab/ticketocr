@@ -649,13 +649,7 @@ with st.sidebar:
     """)
 
     st.header("📊 Analytics")
-    st.markdown("Open the analytics dashboard (runs on a separate port):")
-    analytics_url = st.text_input(
-        "Analytics URL",
-        value="http://localhost:8505",
-        help="Run `streamlit run analytics.py --server.port 8505` to start it.",
-    )
-    st.markdown(f"[Open Analytics]({analytics_url})")
+    st.page_link("pages/analytics.py", label="Open Analytics", icon="📊")
     
     st.header("🔧 About")
     st.markdown("""
