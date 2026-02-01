@@ -648,9 +648,6 @@ with st.sidebar:
     - Avoid blurry or rotated images
     """)
 
-    st.header("📊 Analytics")
-    st.page_link("pages/analytics.py", label="Open Analytics", icon="📊")
-    
     st.header("🔧 About")
     st.markdown("""
     This app uses Groq's LLM API with vision capabilities to extract information from supermarket receipts.
