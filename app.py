@@ -395,6 +395,168 @@ def save_products_to_supabase(supabase_client, products, store_name=None, date=N
 
     return None, "Error saving to Supabase."
 
+def render_analytics():
+    st.title("📊 Analytics")
+    st.markdown("Overview of saved receipt items and full history from `receipt_products`.")
+
+    if st.button("🔄 Refresh Data"):
+        st.rerun()
+
+    data, error = fetch_receipts()
+    if error:
+        st.error(f"Supabase error: {error}")
+    st.caption(f"Loaded {len(data)} rows from `receipt_products`.")
+    if not data:
+        st.info("No data found in `receipt_products`. Save receipts first from the main app.")
+        return
+
+    df = pd.DataFrame(data)
+
+    # Normalize columns
+    df["product_quantity_num"] = df.get("product_quantity", "").apply(parse_number)
+    df["product_price_num"] = df.get("product_price", "").apply(parse_number)
+    df["total_line_value"] = df["product_quantity_num"].fillna(1) * df["product_price_num"].fillna(0)
+
+    # Metrics
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Rows", len(df))
+    col2.metric("Unique Products", df["product_name"].nunique())
+    col3.metric("Total Spend", f"{df['total_line_value'].sum():.2f}")
+    col4.metric("Unique Stores", df["store_name"].nunique())
+
+    st.divider()
+
+    # Charts
+    left, right = st.columns(2)
+
+    with left:
+        st.subheader("Top Products by Spend")
+        top_products = (
+            df.groupby("product_name", dropna=True)["total_line_value"]
+            .sum()
+            .sort_values(ascending=False)
+            .head(10)
+        )
+        st.bar_chart(top_products)
+
+    with right:
+        st.subheader("Top Products by Quantity")
+        top_qty = (
+            df.groupby("product_name", dropna=True)["product_quantity_num"]
+            .sum()
+            .sort_values(ascending=False)
+            .head(10)
+        )
+        st.bar_chart(top_qty)
+
+    st.divider()
+
+    st.subheader("All Line Items")
+    display_cols = [
+        "created_at",
+        "store_name",
+        "receipt_date",
+        "product_name",
+        "product_quantity",
+        "product_price",
+        "total_amount",
+        "image_url",
+    ]
+    cols_present = [c for c in display_cols if c in df.columns]
+    st.dataframe(df[cols_present], use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    # Transactions summary
+    st.subheader("All Transactions")
+
+    def build_tx_key(row):
+        if pd.notna(row.get("image_url")) and str(row.get("image_url")).strip():
+            return f"img:{row.get('image_url')}"
+        store = str(row.get("store_name") or "").strip()
+        date = str(row.get("receipt_date") or "").strip()
+        total = str(row.get("total_amount") or "").strip()
+        created = str(row.get("created_at") or "").split("T")[0]
+        return f"meta:{store}|{date}|{total}|{created}"
+
+    df["transaction_key"] = df.apply(build_tx_key, axis=1)
+
+    tx = (
+        df.groupby("transaction_key", dropna=False)
+        .agg(
+            created_at=("created_at", "max"),
+            store_name=("store_name", "first"),
+            receipt_date=("receipt_date", "first"),
+            total_amount=("total_amount", "first"),
+            items_count=("product_name", "count"),
+            items_sum=("total_line_value", "sum"),
+            image_url=("image_url", "first"),
+        )
+        .reset_index(drop=False)
+        .sort_values("created_at", ascending=False)
+    )
+
+    st.dataframe(
+        tx[
+            [
+                "created_at",
+                "store_name",
+                "receipt_date",
+                "total_amount",
+                "items_count",
+                "items_sum",
+                "image_url",
+            ]
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+with st.sidebar:
+    st.header("🧭 Mode")
+    mode = st.radio(
+        "Select mode",
+        ["Upload & Analyze", "Analytics"],
+        label_visibility="collapsed",
+    )
+
+    st.header("📖 Instructions")
+    st.markdown("""
+    1. **Upload Image**: Click on the upload area and select your receipt image
+    2. **Analyze**: Click the "Analyze Receipt" button
+    3. **View Results**: The extracted information will be displayed below
+    4. **Save to Supabase**: Click "Save to Supabase" to store products in database
+    
+    **Supported formats**: PNG, JPG, JPEG, WEBP
+    
+    **Tips for best results**:
+    - Use clear, well-lit images
+    - Ensure the receipt is fully visible
+    - Avoid blurry or rotated images
+    """)
+
+    st.header("🔧 About")
+    st.markdown("""
+    This app uses Groq's LLM API with vision capabilities to extract information from supermarket receipts.
+    
+    **Model**: meta-llama/llama-4-scout-17b-16e-instruct
+    
+    **Storage Setup**:
+    - Bucket name: `receipt-images` (used by the app)
+    - Make the bucket **Public**
+    - Go to **Policies** tab and create a policy:
+      - Policy name: "Allow public uploads"
+      - Allowed operation: INSERT
+      - Target roles: anon, authenticated
+      - USING expression: `true`
+      - WITH CHECK expression: `true`
+    - Optional: set `SUPABASE_SERVICE_ROLE_KEY` env var to let the app create the bucket automatically
+    """)
+
+if mode == "Analytics":
+    render_analytics()
+    st.stop()
+
 # --- Main app UI ---
 st.title("🛒 Supermarket Ticket OCR")
 st.markdown("Upload a supermarket receipt or ticket to extract information using AI")
@@ -621,7 +783,7 @@ if st.session_state.analysis_complete:
                     if saved_data:
                         st.success(f"✅ Successfully saved {len(saved_data)} products to Supabase!")
                         st.info("💡 Tip: You can view the data in your Supabase dashboard under the 'receipt_products' table.")
-                        with st.expander("📋 View saved data"):
+                        with st.expander("📋 View saved data")
                             st.json(saved_data[:3] if len(saved_data) > 3 else saved_data)
                     else:
                         st.warning("⚠️ Save operation completed but no data was returned. Please check Supabase dashboard.")
@@ -630,41 +792,3 @@ if st.session_state.analysis_complete:
                 print(f"DEBUG: Unexpected error in button handler: {e}")
                 import traceback
                 traceback.print_exc()
-
-# Sidebar with instructions
-with st.sidebar:
-    st.header("📖 Instructions")
-    st.markdown("""
-    1. **Upload Image**: Click on the upload area and select your receipt image
-    2. **Analyze**: Click the "Analyze Receipt" button
-    3. **View Results**: The extracted information will be displayed below
-    4. **Save to Supabase**: Click "Save to Supabase" to store products in database
-    
-    **Supported formats**: PNG, JPG, JPEG, WEBP
-    
-    **Tips for best results**:
-    - Use clear, well-lit images
-    - Ensure the receipt is fully visible
-    - Avoid blurry or rotated images
-    """)
-
-    st.header("📊 Analytics")
-    st.markdown("[Open Analytics](/analyse)")
-
-    st.header("🔧 About")
-    st.markdown("""
-    This app uses Groq's LLM API with vision capabilities to extract information from supermarket receipts.
-    
-    **Model**: meta-llama/llama-4-scout-17b-16e-instruct
-    
-    **Storage Setup**:
-    - Bucket name: `receipt-images` (used by the app)
-    - Make the bucket **Public**
-    - Go to **Policies** tab and create a policy:
-      - Policy name: "Allow public uploads"
-      - Allowed operation: INSERT
-      - Target roles: anon, authenticated
-      - USING expression: `true`
-      - WITH CHECK expression: `true`
-    - Optional: set `SUPABASE_SERVICE_ROLE_KEY` env var to let the app create the bucket automatically
-    """)
