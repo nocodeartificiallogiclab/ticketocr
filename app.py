@@ -14,7 +14,7 @@ import os
 # --- Page configuration ---
 st.set_page_config(
     page_title="Supermarket Ticket OCR",
-    page_icon="🛒",
+    page_icon="cart",
     layout="centered"
 )
 
@@ -35,6 +35,14 @@ SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 @st.cache_resource
 def get_supabase_client():
     return create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+
+def fetch_receipts():
+    supabase = get_supabase_client()
+    resp = supabase.table("receipt_products").select("*").order("created_at", desc=True).execute()
+    data = resp.data or []
+    error = getattr(resp, "error", None)
+    return data, error
 
 # Admin client (optional) for bucket creation
 @st.cache_resource
@@ -117,7 +125,7 @@ def analyze_image_with_groq(client, image_base64):
                         "content": [
                             {
                                 "type": "text",
-                                "text": "Analyze this supermarket receipt/ticket. Extract all products with their details. For each product, provide:\n- Product Name\n- Product Quantity (if available, otherwise put 1)\n- Product Price\n\nReturn the response as a JSON object with this structure:\n{\n  \"store_name\": \"store name\",\n  \"date\": \"date\",\n  \"total\": \"total amount\",\n  \"products\": [\n    {\"product_name\": \"item name\", \"quantity\": \"quantity\", \"price\"},\n    ...\n  ]\n}\n\nIf you cannot find quantity for a product, use \"1\" as default. Ensure all prices are in the same currency format as shown on the receipt."
+                                "text": "Analyze this supermarket receipt/ticket. Extract all products with their details. For each product, provide:\n- Product Name\n- Product Quantity (if available, otherwise put 1)\n- Product Price\n\nReturn the response as a JSON object with this structure:\n{\n  \"store_name\": \"store name\",\n  \"date\": \"date\",\n  \"total\": \"total amount\",\n  \"products\": [\n    {\"product_name\": \"item name\", \"quantity\": \"quantity\", \"price\": \"price\"},\n    ...\n  ]\n}\n\nIf you cannot find quantity for a product, use \"1\" as default. Ensure all prices are in the same currency format as shown on the receipt."
                             },
                             {
                                 "type": "image_url",
@@ -201,7 +209,7 @@ def parse_products_from_response(response_text):
         if line and not line.startswith('#'):
             # Try to extract product info from various formats
             # This is a basic fallback - AI should ideally return JSON
-            if any(keyword in line.lower() for keyword in ['product', 'item', '$', '€', '£']):
+            if any(keyword in line.lower() for keyword in ['product', 'item', '$', 'eur', 'gbp']):
                 # Simple pattern matching as fallback
                 parts = re.split(r'[-|\t|,]+', line)
                 if len(parts) >= 2:
@@ -396,10 +404,10 @@ def save_products_to_supabase(supabase_client, products, store_name=None, date=N
     return None, "Error saving to Supabase."
 
 def render_analytics():
-    st.title("📊 Analytics")
+    st.title(" Analytics")
     st.markdown("Overview of saved receipt items and full history from `receipt_products`.")
 
-    if st.button("🔄 Refresh Data"):
+    if st.button(" Refresh Data"):
         st.rerun()
 
     data, error = fetch_receipts()
@@ -513,14 +521,14 @@ def render_analytics():
     )
 
 with st.sidebar:
-    st.header("🧭 Mode")
+    st.header(" Mode")
     mode = st.radio(
         "Select mode",
         ["Upload & Analyze", "Analytics"],
         label_visibility="collapsed",
     )
 
-    st.header("📖 Instructions")
+    st.header(" Instructions")
     st.markdown("""
     1. **Upload Image**: Click on the upload area and select your receipt image
     2. **Analyze**: Click the "Analyze Receipt" button
@@ -535,7 +543,7 @@ with st.sidebar:
     - Avoid blurry or rotated images
     """)
 
-    st.header("🔧 About")
+    st.header(" About")
     st.markdown("""
     This app uses Groq's LLM API with vision capabilities to extract information from supermarket receipts.
     
@@ -553,12 +561,13 @@ with st.sidebar:
     - Optional: set `SUPABASE_SERVICE_ROLE_KEY` env var to let the app create the bucket automatically
     """)
 
+
 if mode == "Analytics":
     render_analytics()
     st.stop()
 
 # --- Main app UI ---
-st.title("🛒 Supermarket Ticket OCR")
+st.title(" Supermarket Ticket OCR")
 st.markdown("Upload a supermarket receipt or ticket to extract information using AI")
 
 # Initialize session state
@@ -601,7 +610,7 @@ if uploaded_file is not None:
     upload_bytes, upload_mime = image_to_bytes(image, max_size=(800, 800), jpeg_quality=70)
     
     # Analyze button
-    if st.button("🔍 Analyze Receipt", type="primary"):
+    if st.button(" Analyze Receipt", type="primary"):
         print(f"\n{'='*60}")
         print("DEBUG: Analyze button clicked")
         print(f"Image size: {image.size}")
@@ -618,10 +627,10 @@ if uploaded_file is not None:
             if admin_client:
                 bucket_error = ensure_bucket_exists(admin_client)
                 if bucket_error:
-                    st.warning(f"⚠️ Bucket setup issue: {bucket_error}")
+                    st.warning(f" Bucket setup issue: {bucket_error}")
             else:
                 st.info(
-                    f"ℹ️ To auto-create the storage bucket, set "
+                    f" To auto-create the storage bucket, set "
                     f"the SUPABASE_SERVICE_ROLE_KEY environment variable."
                 )
 
@@ -632,11 +641,11 @@ if uploaded_file is not None:
             )
             
             if upload_error:
-                st.warning(f"⚠️ Image upload failed: {upload_error}")
+                st.warning(f" Image upload failed: {upload_error}")
                 st.info("Continuing with analysis, but image won't be saved to storage.")
                 image_url = None
             else:
-                st.success("✅ Image uploaded to storage!")
+                st.success(" Image uploaded to storage!")
             
             # Analyze with Groq
             client = get_groq_client()
@@ -670,12 +679,12 @@ if uploaded_file is not None:
                 st.session_state.raw_response = result
     
 else:
-    st.info("👆 Please upload an image file to get started")
+    st.info(" Please upload an image file to get started")
 
 # Results + edit section (persists across reruns)
 if st.session_state.analysis_complete:
     st.divider()
-    st.markdown("### ✅ Extraction Results")
+    st.markdown("###  Extraction Results")
 
     metadata = st.session_state.metadata
     products = st.session_state.products
@@ -692,7 +701,7 @@ if st.session_state.analysis_complete:
 
     # Display editable products table
     if products:
-        st.markdown("### 📦 Products")
+        st.markdown("###  Products")
         if st.session_state.products_df is None:
             st.session_state.products_df = pd.DataFrame([{
                 "Product Name": p.get("product_name", ""),
@@ -700,7 +709,7 @@ if st.session_state.analysis_complete:
                 "Product Price": p.get("price", "0")
             } for p in products])
 
-        st.info("✏️ You can edit the extracted data before saving to Supabase.")
+        st.info(" You can edit the extracted data before saving to Supabase.")
         edited_df = st.data_editor(
             st.session_state.products_df,
             use_container_width=True,
@@ -709,11 +718,11 @@ if st.session_state.analysis_complete:
         )
         st.session_state.products_df = edited_df
     else:
-        st.warning("⚠️ No products were extracted. Showing full response:")
+        st.warning(" No products were extracted. Showing full response:")
         if st.session_state.raw_response:
             st.markdown(st.session_state.raw_response)
             st.download_button(
-                label="📥 Download Full Results (Text)",
+                label=" Download Full Results (Text)",
                 data=st.session_state.raw_response,
                 file_name="receipt_analysis.txt",
                 mime="text/plain"
@@ -721,15 +730,15 @@ if st.session_state.analysis_complete:
 
     # Save section AFTER extraction/editing
     st.divider()
-    st.markdown("### 💾 Save to Database")
+    st.markdown("###  Save to Database")
 
     products_df = st.session_state.products_df
     if products_df is not None:
-        st.info(f"📦 {len(products_df)} products ready to save")
+        st.info(f" {len(products_df)} products ready to save")
     else:
-        st.info(f"📦 {len(st.session_state.products)} products ready to save")
+        st.info(f" {len(st.session_state.products)} products ready to save")
 
-    if st.button("💾 Save to Supabase", type="primary", key="save_to_supabase_main"):
+    if st.button(" Save to Supabase", type="primary", key="save_to_supabase_main"):
         with st.spinner("Saving products to Supabase..."):
             try:
                 supabase_client = get_supabase_client()
@@ -777,18 +786,18 @@ if st.session_state.analysis_complete:
                 )
 
                 if error:
-                    st.error(f"❌ {error}")
+                    st.error(f" {error}")
                     st.error("Check the terminal/console for detailed error information.")
                 else:
                     if saved_data:
-                        st.success(f"✅ Successfully saved {len(saved_data)} products to Supabase!")
-                        st.info("💡 Tip: You can view the data in your Supabase dashboard under the 'receipt_products' table.")
-                        with st.expander("📋 View saved data"):
+                        st.success(f" Successfully saved {len(saved_data)} products to Supabase!")
+                        st.info(" Tip: You can view the data in your Supabase dashboard under the 'receipt_products' table.")
+                        with st.expander(" View saved data"):
                             st.json(saved_data[:3] if len(saved_data) > 3 else saved_data)
                     else:
-                        st.warning("⚠️ Save operation completed but no data was returned. Please check Supabase dashboard.")
+                        st.warning(" Save operation completed but no data was returned. Please check Supabase dashboard.")
             except Exception as e:
-                st.error(f"❌ Unexpected error: {str(e)}")
+                st.error(f" Unexpected error: {str(e)}")
                 print(f"DEBUG: Unexpected error in button handler: {e}")
                 import traceback
                 traceback.print_exc()
