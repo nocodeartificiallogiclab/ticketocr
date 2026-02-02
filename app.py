@@ -117,7 +117,7 @@ def analyze_image_with_groq(client, image_base64):
                         "content": [
                             {
                                 "type": "text",
-                                "text": "Analyze this supermarket receipt/ticket. Extract all products with their details. For each product, provide:\n- Product Name\n- Product Quantity (if available, otherwise put 1)\n- Product Price\n\nReturn the response as a JSON object with this structure:\n{\n  \"store_name\": \"store name\",\n  \"date\": \"date\",\n  \"total\": \"total amount\",\n  \"products\": [\n    {\"product_name\": \"item name\", \"quantity\": \"quantity\", \"price\": \"price\"},\n    ...\n  ]\n}\n\nIf you cannot find quantity for a product, use \"1\" as default. Ensure all prices are in the same currency format as shown on the receipt."
+                                "text": "Analyze this supermarket receipt/ticket. Extract all products with their details. For each product, provide:\n- Product Name\n- Product Quantity (if available, otherwise put 1)\n- Product Price\n\nReturn the response as a JSON object with this structure:\n{\n  \"store_name\": \"store name\",\n  \"date\": \"date\",\n  \"total\": \"total amount\",\n  \"products\": [\n    {\"product_name\": \"item name\", \"quantity\": \"quantity\", \"price\"},\n    ...\n  ]\n}\n\nIf you cannot find quantity for a product, use \"1\" as default. Ensure all prices are in the same currency format as shown on the receipt."
                             },
                             {
                                 "type": "image_url",
@@ -783,7 +783,7 @@ if st.session_state.analysis_complete:
                     if saved_data:
                         st.success(f"✅ Successfully saved {len(saved_data)} products to Supabase!")
                         st.info("💡 Tip: You can view the data in your Supabase dashboard under the 'receipt_products' table.")
-                        with st.expander("📋 View saved data")
+                        with st.expander("📋 View saved data"):
                             st.json(saved_data[:3] if len(saved_data) > 3 else saved_data)
                     else:
                         st.warning("⚠️ Save operation completed but no data was returned. Please check Supabase dashboard.")
